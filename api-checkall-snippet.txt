@@ -1,0 +1,21 @@
+
+if (isset($_POST['check_all'])) {
+    $domains = $pdo->query("SELECT * FROM domains")->fetchAll();
+    foreach ($domains as $domain) {
+        $result = check_ssl($domain['url']);
+        $stmtUpdate = $pdo->prepare("UPDATE domains SET valid_to = ?, days_left = ?, last_checked = NOW() WHERE id = ?");
+        if ($result['valid']) {
+            $stmtUpdate->execute([$result['valid_to'], $result['days_left'], $domain['id']]);
+            if ($result['days_left'] <= 15) {
+                $msg = "🔔 SSL domain akan expired dalam {$result['days_left']} hari (hingga {$result['valid_to']})";
+                send_notification($domain['url'], $msg);
+                $log = $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)");
+                $log->execute([$domain['id'], $msg]);
+            }
+        } else {
+            $stmtUpdate->execute([null, null, $domain['id']]);
+        }
+    }
+    header('Location: domains.php');
+    exit;
+}

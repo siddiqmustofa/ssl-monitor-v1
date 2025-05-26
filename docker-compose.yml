@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ssl-monitor-web-1
+    ports:
+      - "8081:80"
+    volumes:
+      - ./app:/var/www/html
+
+    environment:
+      - TZ=Asia/Jakarta
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:5.7
+    container_name: ssl-monitor-mysql-1
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: ssl_monitor
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./mysql-timezone.cnf:/etc/mysql/conf.d/timezone.cnf:ro
+
+#      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
+volumes:
+  dbdata:
+

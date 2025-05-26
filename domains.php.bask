@@ -1,0 +1,114 @@
+<?php
+session_start();
+if (!isset($_SESSION['logged_in'])) {
+  header('Location: login.php');
+  exit;
+}
+require 'db.php';
+$domains = $pdo->query("SELECT * FROM domains ORDER BY last_checked DESC")->fetchAll();
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kelola Domain - SSL Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script>
+    function filterDomains() {
+      const input = document.getElementById("searchInput");
+      const filter = input.value.toLowerCase();
+      const rows = document.querySelectorAll("#domainTable tbody tr");
+
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(filter) ? "" : "none";
+      });
+    }
+  </script>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">SSL Monitor</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link active" href="domains.php">Kelola Domain</a></li>
+          <li class="nav-item"><a class="nav-link" href="settings.php">Pengaturan</a></li>
+          <li class="nav-item"><a class="nav-link" href="users.php">Pengguna</a></li>
+          <li class="nav-item"><a class="nav-link" href="logout.php">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <h2 class="mb-4">🔧 Kelola Domain</h2>
+    <form method="POST" action="api.php" class="card p-3 mb-4 shadow-sm">
+      <div class="row g-2">
+        <div class="col-md-10">
+          <input type="text" name="url" class="form-control" placeholder="example.com atau https://example.com" required>
+        </div>
+        <div class="col-md-2 d-grid">
+          <button type="submit" class="btn btn-primary">Tambah Domain</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="mb-3">
+      <input type="text" id="searchInput" class="form-control" onkeyup="filterDomains()" placeholder="Cari domain...">
+    </div>
+
+    <div class="card">
+      <div class="card-header">Daftar Domain</div>
+      <div class="table-responsive">
+        <table class="table table-hover text-center mb-0" id="domainTable">
+          <thead class="table-light">
+            <tr>
+              <th>Domain</th>
+              <th>Valid Hingga</th>
+              <th>Sisa Hari</th>
+              <th>Terakhir Dicek</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($domains as $d): ?>
+              <?php
+                $badge = 'secondary';
+                if (is_null($d['days_left'])) $badge = 'danger';
+                elseif ($d['days_left'] <= 15) $badge = 'warning';
+                else $badge = 'success';
+              ?>
+              <tr>
+                <td><span class="badge rounded-circle bg-<?= $badge ?> me-1">&nbsp;</span><?= htmlspecialchars($d['url']) ?></td>
+                <td><?= $d['valid_to'] ?? '-' ?></td>
+                <td><?= $d['days_left'] ?? '-' ?></td>
+                <td><?= $d['last_checked'] ?? '-' ?></td>
+                <td>
+                  <form method="POST" action="api.php" class="d-inline">
+                    <input type="hidden" name="check_id" value="<?= $d['id'] ?>">
+                    <button class="btn btn-sm btn-primary">🔁 Cek</button>
+                  </form>
+                  <form method="POST" action="api.php" class="d-inline">
+                    <input type="hidden" name="notify_id" value="<?= $d['id'] ?>">
+                    <button class="btn btn-sm btn-warning">🔔 Paksa Notif</button>
+                  </form>
+                  <form method="POST" action="api.php" class="d-inline" onsubmit="return confirm('Hapus domain ini?')">
+                    <input type="hidden" name="delete_id" value="<?= $d['id'] ?>">
+                    <button class="btn btn-sm btn-danger">🗑</button>
+                  </form>
+                </td>
+              </tr>
+            <?php endforeach ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

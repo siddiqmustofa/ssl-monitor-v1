@@ -1,5 +1,4 @@
 <?php
-ob_start();
 session_start();
 if (!isset($_SESSION['logged_in'])) {
   header('Location: login.php');
@@ -7,23 +6,7 @@ if (!isset($_SESSION['logged_in'])) {
 }
 require 'db.php';
 
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$limit = 25;
-$offset = ($page - 1) * $limit;
-
-$sort = $_GET['sort'] ?? 'last_checked';
-$allowed = ['url', 'valid_to', 'days_left', 'last_checked'];
-$orderBy = in_array($sort, $allowed) ? $sort : 'last_checked';
-
-$total = $pdo->query("SELECT COUNT(*) FROM domains")->fetchColumn();
-$pages = ceil($total / $limit);
-
-$stmt = $pdo->prepare("SELECT * FROM domains ORDER BY $orderBy DESC LIMIT :limit OFFSET :offset");
-$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-$stmt->execute();
-$domains = $stmt->fetchAll();
-ob_end_flush();
+$domains = $pdo->query("SELECT * FROM domains ORDER BY last_checked DESC")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -32,112 +15,129 @@ ob_end_flush();
   <title>Kelola Domain - SSL Monitor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background: #f8f9fa; font-family: 'Inter', sans-serif; }
-    .badge-status { width: 16px; height: 16px; border-radius: 50%; display: inline-block; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f1f3f5;
+    }
+    .sidebar {
+      height: 100vh;
+      background-color: #343a40;
+      color: white;
+      position: fixed;
+      width: 240px;
+      top: 0;
+      left: 0;
+      padding: 1rem;
+    }
+    .sidebar a {
+      color: #adb5bd;
+      text-decoration: none;
+      display: block;
+      padding: 0.5rem 0;
+    }
+    .sidebar a.active, .sidebar a:hover {
+      color: #ffffff;
+      background-color: #495057;
+      border-radius: 5px;
+      padding-left: 10px;
+    }
+    .main {
+      margin-left: 240px;
+      padding: 2rem;
+    }
+    .badge-status {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    td.domain-cell {
+      text-align: left !important;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid px-4">
-    <a class="navbar-brand" href="dashboard.php">🔐 SSL Monitor</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse justify-content-end" id="nav">
-      <ul class="navbar-nav">
-        <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link active" href="domains.php">Domains</a></li>
-        <li class="nav-item"><a class="nav-link" href="domain_expiry_notify.php">Whois</a></li>
-        <li class="nav-item"><a class="nav-link" href="settings.php">Settings</a></li>
-        <li class="nav-item"><a class="nav-link" href="users.php">Users</a></li>
-        <li class="nav-item"><a class="nav-link" href="logs.php">Logs</a></li>
-        <li class="nav-item"><a class="nav-link" href="logout.php">Logout</a></li>
-      </ul>
+<div class="sidebar">
+  <h5 class="text-white">🔐 SSL Monitor</h5>
+  <hr class="border-light">
+  <a href="dashboard.php"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+  <a href="domains.php" class="active"><i class="bi bi-globe2 me-2"></i>SSL</a>
+  <a href="domain_expiry_notify.php"><i class="bi bi-calendar2-week me-2"></i>Cek Expired Domain</a>
+  <a href="settings.php"><i class="bi bi-gear me-2"></i>Pengaturan</a>
+  <a href="users.php"><i class="bi bi-people me-2"></i>Pengguna</a>
+  <a href="logs.php"><i class="bi bi-clock-history me-2"></i>Log</a>
+  <a href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+</div>
+
+<div class="main">
+  <h2 class="mb-4">🌐 Kelola Domain</h2>
+  <form method="POST" action="api.php" class="row g-2 mb-4">
+    <div class="col-md-10">
+      <input type="text" name="url" class="form-control" placeholder="example.com atau https://example.com" required>
     </div>
-  </div>
-</nav>
-
-<div class="container py-4">
-  <h2 class="mb-4">🌐 Manage Domains</h2>
-
-  <!-- Form import file -->
-  <form method="POST" action="import_domains.php" enctype="multipart/form-data" class="d-flex mb-3">
-    <input type="file" name="import_file" class="form-control me-2" accept=".txt" required>
-    <button class="btn btn-success">📥 Import dari File</button>
+    <div class="col-md-2 d-grid">
+      <button type="submit" class="btn btn-primary">Tambah Domain</button>
+    </div>
   </form>
 
-  <!-- Form tambah domain -->
-  <form method="POST" action="api.php" class="d-flex mb-4">
-    <input type="text" name="url" class="form-control me-2" placeholder="example.com atau https://example.com" required>
-    <button class="btn btn-primary">Tambah Domain</button>
-  </form>
-
-  <!-- Tabel domain -->
-  <form method="POST" action="api.php">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Daftar Domain</span>
+      <form method="POST" action="api.php" onsubmit="return confirm('Cek semua domain sekarang?')">
+        <input type="hidden" name="check_all" value="1">
+        <button class="btn btn-sm btn-outline-primary">🔁 Cek Semua</button>
+      </form>
+    </div>
     <div class="table-responsive">
-      <table class="table table-bordered text-center bg-white">
-        <thead class="table-light">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light text-center">
           <tr>
-            <th><input type="checkbox" onclick="toggleSelectAll(this)"></th>
-            <th><a href="?sort=url">Domain</a></th>
-            <th>Status</th>
-            <th><a href="?sort=valid_to">Valid Hingga</a></th>
-            <th><a href="?sort=days_left">Sisa Hari</a></th>
-            <th><a href="?sort=last_checked">Terakhir Dicek</a></th>
+            <th class="text-start">Domain</th>
+            <th>Valid Hingga</th>
+            <th>Sisa Hari</th>
+            <th>Terakhir Dicek</th>
             <th>Aksi</th>
           </tr>
         </thead>
         <tbody>
           <?php foreach ($domains as $d): ?>
-          <?php
-            $color = 'bg-secondary';
-            if (is_null($d['days_left'])) $color = 'bg-danger';
-            elseif ($d['days_left'] <= 15) $color = 'bg-warning';
-            else $color = 'bg-success';
-          ?>
-          <tr>
-            <td><input type="checkbox" name="domain_ids[]" value="<?= $d['id'] ?>"></td>
-            <td><?= htmlspecialchars($d['url']) ?></td>
-            <td><span class="badge-status <?= $color ?>"></span></td>
-            <td><?= $d['valid_to'] ?? '-' ?></td>
-            <td><?= $d['days_left'] ?? '-' ?></td>
-            <td><?= $d['last_checked'] ?? '-' ?></td>
-            <td>
-              <button class="btn btn-sm btn-primary" name="check_id" value="<?= $d['id'] ?>">🔁</button>
-              <button class="btn btn-sm btn-warning" name="notify_id" value="<?= $d['id'] ?>">🔔</button>
-              <button class="btn btn-sm btn-danger" name="delete_id" value="<?= $d['id'] ?>" onclick="return confirm('Hapus domain ini?')">🗑</button>
-            </td>
-          </tr>
+            <?php
+              $badge = 'bg-secondary';
+              if (is_null($d['days_left'])) $badge = 'bg-danger';
+              elseif ($d['days_left'] <= 15) $badge = 'bg-warning';
+              else $badge = 'bg-success';
+            ?>
+            <tr>
+              <td class="domain-cell">
+                <span class="badge-status <?= $badge ?>"></span><?= htmlspecialchars($d['url']) ?>
+              </td>
+              <td class="text-center"><?= $d['valid_to'] ?? '-' ?></td>
+              <td class="text-center"><?= $d['days_left'] ?? '-' ?></td>
+              <td class="text-center"><?= $d['last_checked'] ?? '-' ?></td>
+              <td class="text-center">
+                <form method="POST" action="api.php" class="d-inline">
+                  <input type="hidden" name="check_id" value="<?= $d['id'] ?>">
+                  <button class="btn btn-sm btn-primary" title="Cek SSL">🔁</button>
+                </form>
+                <form method="POST" action="api.php" class="d-inline">
+                  <input type="hidden" name="notify_id" value="<?= $d['id'] ?>">
+                  <button class="btn btn-sm btn-warning" title="Kirim Notif">🔔</button>
+                </form>
+                <form method="POST" action="api.php" class="d-inline" onsubmit="return confirm('Hapus domain ini?')">
+                  <input type="hidden" name="delete_id" value="<?= $d['id'] ?>">
+                  <button class="btn btn-sm btn-danger" title="Hapus">🗑</button>
+                </form>
+              </td>
+            </tr>
           <?php endforeach ?>
         </tbody>
       </table>
     </div>
-
-    <!-- Aksi massal dan pagination -->
-    <div class="d-flex justify-content-between mt-3">
-      <div>
-        <button name="check_selected" value="1" class="btn btn-outline-primary btn-sm">🔁 Cek Terpilih</button>
-        <button name="notify_selected" value="1" class="btn btn-outline-secondary btn-sm">🔔 Notif Terpilih</button>
-        <button name="delete_selected" value="1" class="btn btn-outline-danger btn-sm" onclick="return confirm('Hapus domain terpilih?')">🗑 Hapus Terpilih</button>
-      </div>
-      <nav>
-        <ul class="pagination pagination-sm mb-0">
-          <?php for ($i = 1; $i <= $pages; $i++): ?>
-            <li class="page-item <?= ($i === $page) ? 'active' : '' ?>">
-              <a class="page-link" href="?page=<?= $i ?>&sort=<?= urlencode($orderBy) ?>"><?= $i ?></a>
-            </li>
-          <?php endfor ?>
-        </ul>
-      </nav>
-    </div>
-  </form>
+  </div>
 </div>
-
-<script>
-function toggleSelectAll(source) {
-  document.querySelectorAll('input[name="domain_ids[]"]').forEach(cb => cb.checked = source.checked);
-}
-</script>
 </body>
 </html>

@@ -57,44 +57,62 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
 // Ambil data semua user
 $users = $pdo->query("SELECT * FROM users ORDER BY id")->fetchAll();
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>User Management</title>
+  <title>Pengguna - SSL Monitor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f5f7fa; }
-    .navbar-dark .navbar-nav .nav-link.active { font-weight: bold; color: #fff; }
-    .container { max-width: 1200px; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f1f3f5;
+    }
+    .sidebar {
+      height: 100vh;
+      background-color: #343a40;
+      color: white;
+      position: fixed;
+      width: 240px;
+      top: 0;
+      left: 0;
+      padding: 1rem;
+    }
+    .sidebar a {
+      color: #adb5bd;
+      text-decoration: none;
+      display: block;
+      padding: 0.5rem 0;
+    }
+    .sidebar a.active, .sidebar a:hover {
+      color: #ffffff;
+      background-color: #495057;
+      border-radius: 5px;
+      padding-left: 10px;
+    }
+    .main {
+      margin-left: 240px;
+      padding: 2rem;
+    }
   </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid px-4">
-    <a class="navbar-brand" href="#">🔐 SSL Monitor</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-      <ul class="navbar-nav">
-       <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'domains.php' ? 'active' : '' ?>" href="domains.php">Domains</a></li>
-        <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'domain_expiry_notify.php' ? 'active' : '' ?>" href="domain_expiry_notify.php">Whois</a></li>
-        <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'settings.php' ? 'active' : '' ?>" href="settings.php">Settings</a></li>
-        <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'users.php' ? 'active' : '' ?>" href="users.php">Users</a></li>
-        <li class="nav-item"><a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'logs.php' ? 'active' : '' ?>" href="logs.php">Logs</a></li>
-        <li class="nav-item"><a class="nav-link" href="logout.php">Logout</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
+<div class="sidebar">
+  <h5 class="text-white">🔐 SSL Monitor</h5>
+  <hr class="border-light">
+  <a href="dashboard.php"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+  <a href="domains.php"><i class="bi bi-globe2 me-2"></i>SSL</a>
+  <a href="domain_expiry_notify.php"><i class="bi bi-calendar2-week me-2"></i>Cek Expired Domain</a>
+  <a href="settings.php"><i class="bi bi-gear me-2"></i>Pengaturan</a>
+  <a href="users.php" class="active"><i class="bi bi-people me-2"></i>Pengguna</a>
+  <a href="logs.php"><i class="bi bi-clock-history me-2"></i>Log</a>
+  <a href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+</div>
 
-<div class="container py-5">
-  <h2 class="mb-4">👥 User Management</h2>
+<div class="main">
+  <h2 class="mb-4">👥 Pengguna</h2>
 
   <?php if (isset($_GET['changed'])): ?>
     <div class="alert alert-success">Password berhasil diganti.</div>
@@ -105,52 +123,63 @@ $users = $pdo->query("SELECT * FROM users ORDER BY id")->fetchAll();
 
   <div class="row mb-4">
     <div class="col-md-6">
-      <h5>Tambah User Baru</h5>
-      <form method="post">
-        <input type="text" name="new_user" placeholder="Username" required class="form-control mb-2">
-        <input type="password" name="new_pass" placeholder="Password" required class="form-control mb-2">
-        <select name="role" class="form-control mb-2" required>
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
-        <button type="submit" class="btn btn-primary">Tambah</button>
-      </form>
+      <div class="card p-3">
+        <h5>Tambah User Baru</h5>
+        <form method="post">
+          <input type="text" name="new_user" placeholder="Username" required class="form-control mb-2">
+          <input type="password" name="new_pass" placeholder="Password" required class="form-control mb-2">
+          <select name="role" class="form-select mb-2" required>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="submit" class="btn btn-primary">Tambah</button>
+        </form>
+      </div>
     </div>
     <div class="col-md-6">
-      <h5>Ganti Password Anda</h5>
-      <form method="post">
-        <input type="password" name="new_self_pass" placeholder="Password baru" required class="form-control mb-2">
-        <button type="submit" name="change_pass" class="btn btn-secondary">Ganti Password</button>
-      </form>
+      <div class="card p-3">
+        <h5>Ganti Password Anda</h5>
+        <form method="post">
+          <input type="password" name="new_self_pass" placeholder="Password baru" required class="form-control mb-2">
+          <button type="submit" name="change_pass" class="btn btn-secondary">Ganti Password</button>
+        </form>
+      </div>
     </div>
   </div>
 
   <h5>Daftar User</h5>
-  <table class="table table-bordered">
-    <thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Aksi</th></tr></thead>
-    <tbody>
-      <?php foreach ($users as $user): ?>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle text-center bg-white shadow-sm">
+      <thead class="table-light">
         <tr>
-          <td><?= htmlspecialchars($user['id']) ?></td>
-          <td><?= htmlspecialchars($user['username']) ?></td>
-          <td><?= htmlspecialchars($user['role']) ?></td>
-          <td>
-            <?php if ($user['id'] != $_SESSION['user_id']): ?>
-              <form method="post" style="display:inline-block">
-                <input type="hidden" name="reset_user" value="<?= $user['id'] ?>">
-                <button class="btn btn-warning btn-sm" onclick="return confirm('Reset password user ini ke default?')">Reset</button>
-              </form>
-              <a href="?delete=<?= $user['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus user ini?')">Delete</a>
-            <?php else: ?>
-              <em>(Anda)</em>
-            <?php endif; ?>
-          </td>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Aksi</th>
         </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <?php foreach ($users as $user): ?>
+          <tr>
+            <td><?= htmlspecialchars($user['id']) ?></td>
+            <td><?= htmlspecialchars($user['username']) ?></td>
+            <td><?= htmlspecialchars($user['role']) ?></td>
+            <td>
+              <?php if ($user['id'] != $_SESSION['user_id']): ?>
+                <form method="post" class="d-inline">
+                  <input type="hidden" name="reset_user" value="<?= $user['id'] ?>">
+                  <button class="btn btn-warning btn-sm" onclick="return confirm('Reset password user ini ke default?')">Reset</button>
+                </form>
+                <a href="?delete=<?= $user['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus user ini?')">Delete</a>
+              <?php else: ?>
+                <em>(Anda)</em>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

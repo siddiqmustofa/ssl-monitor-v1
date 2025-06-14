@@ -15,6 +15,17 @@ if (isset($_POST['url'])) {
         $url = 'https://' . $url;
     }
 
+// Tambahan: coba akses www jika domain utama gagal nanti
+$parsed = parse_url($url, PHP_URL_HOST);
+if (substr($parsed, 0, 4) !== 'www.') {
+    $www_version = 'https://www.' . $parsed;
+} else {
+    $non_www = 'https://' . str_replace('www.', '', $parsed);
+}
+
+
+
+
     if (filter_var($url, FILTER_VALIDATE_URL)) {
         $stmt = $pdo->prepare("INSERT INTO domains (url) VALUES (?)");
         $stmt->execute([$url]);

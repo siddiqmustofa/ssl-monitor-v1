@@ -1,5 +1,4 @@
 <?php
-// Siddiq whatismyproxy@gmail.com
 session_start();
 if (!isset($_SESSION['logged_in'])) {
     header('Location: login.php');
@@ -9,7 +8,6 @@ if (!isset($_SESSION['logged_in'])) {
 require 'db.php';
 require 'ssl_check.php';
 require 'notify.php';
-require 'whois_check.php'; // pastikan kamu punya fungsi check_whois($domain)
 
 if (isset($_POST['url'])) {
     $url = trim($_POST['url']);
@@ -17,49 +15,34 @@ if (isset($_POST['url'])) {
         $url = 'https://' . $url;
     }
 
-    $parsed = parse_url($url, PHP_URL_HOST);
-    if (substr($parsed, 0, 4) !== 'www.') {
-        $www_version = 'https://www.' . $parsed;
-    } else {
-        $non_www = 'https://' . str_replace('www.', '', $parsed);
-    }
+// Tambahan: coba akses www jika domain utama gagal nanti
+$parsed = parse_url($url, PHP_URL_HOST);
+if (substr($parsed, 0, 4) !== 'www.') {
+    $www_version = 'https://www.' . $parsed;
+} else {
+    $non_www = 'https://' . str_replace('www.', '', $parsed);
+}
+
+
+
 
     if (filter_var($url, FILTER_VALIDATE_URL)) {
-        $domain = strtolower($parsed);
-
-        // Cek apakah domain sudah ada
-        $cek = $pdo->prepare("SELECT COUNT(*) FROM domains WHERE url = ?");
-        $cek->execute([$domain]);
-        if ($cek->fetchColumn() == 0) {
-            // Insert ke tabel domains (SSL)
-            $stmt = $pdo->prepare("INSERT INTO domains (url) VALUES (?)");
-            $stmt->execute([$domain]);
-            $domain_id = $pdo->lastInsertId();
-
-            // WHOIS lookup langsung
-            $whois = check_whois($domain);
-            $stmt2 = $pdo->prepare("INSERT INTO domain_whois (domain_id, expiry_date, days_left, checked_at) VALUES (?, ?, ?, NOW())");
-            $stmt2->execute([
-                $domain_id,
-                $whois['expiry'] ?? null,
-                $whois['days_left'] ?? null
-            ]);
-        }
+        $stmt = $pdo->prepare("INSERT INTO domains (url) VALUES (?)");
+        $stmt->execute([$url]);
     }
 
     header('Location: domains.php');
     exit;
 }
 
-// === Delete
 if (isset($_POST['delete_id'])) {
     $id = (int)$_POST['delete_id'];
-    $pdo->prepare("DELETE FROM domains WHERE id = ?")->execute([$id]);
+    $stmt = $pdo->prepare("DELETE FROM domains WHERE id = ?");
+    $stmt->execute([$id]);
     header('Location: domains.php');
     exit;
 }
 
-// === Cek SSL satuan
 if (isset($_POST['check_id'])) {
     $id = (int)$_POST['check_id'];
     $stmt = $pdo->prepare("SELECT * FROM domains WHERE id = ?");
@@ -74,7 +57,8 @@ if (isset($_POST['check_id'])) {
             if ($result['days_left'] <= 15) {
                 $msg = "🔔 SSL domain akan expired dalam {$result['days_left']} hari (hingga {$result['valid_to']})";
                 send_notification($domain['url'], $msg);
-                $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)")->execute([$domain['id'], $msg]);
+                $stmt = $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)");
+                $stmt->execute([$domain['id'], $msg]);
             }
         } else {
             $stmtUpdate->execute([null, null, $domain['id']]);
@@ -85,7 +69,6 @@ if (isset($_POST['check_id'])) {
     exit;
 }
 
-// === Paksa notifikasi
 if (isset($_POST['notify_id'])) {
     $id = (int)$_POST['notify_id'];
     $stmt = $pdo->prepare("SELECT * FROM domains WHERE id = ?");
@@ -95,14 +78,15 @@ if (isset($_POST['notify_id'])) {
     if ($domain && $domain['valid_to']) {
         $msg = "🔔 [PAKSA] SSL domain akan expired pada {$domain['valid_to']} (sisa {$domain['days_left']} hari)";
         send_notification($domain['url'], $msg);
-        $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)")->execute([$domain['id'], $msg]);
+
+        $stmt = $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)");
+        $stmt->execute([$domain['id'], $msg]);
     }
 
     header('Location: domains.php');
     exit;
 }
 
-// === Cek semua domain
 if (isset($_POST['check_all'])) {
     $domains = $pdo->query("SELECT * FROM domains")->fetchAll();
     foreach ($domains as $domain) {
@@ -113,7 +97,8 @@ if (isset($_POST['check_all'])) {
             if ($result['days_left'] <= 15) {
                 $msg = "🔔 SSL domain akan expired dalam {$result['days_left']} hari (hingga {$result['valid_to']})";
                 send_notification($domain['url'], $msg);
-                $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)")->execute([$domain['id'], $msg]);
+                $log = $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)");
+                $log->execute([$domain['id'], $msg]);
             }
         } else {
             $stmtUpdate->execute([null, null, $domain['id']]);
@@ -123,7 +108,6 @@ if (isset($_POST['check_all'])) {
     exit;
 }
 
-// === Cek terpilih
 if (isset($_POST['check_selected']) && !empty($_POST['domain_ids'])) {
     foreach ($_POST['domain_ids'] as $id) {
         $id = (int)$id;
@@ -139,7 +123,8 @@ if (isset($_POST['check_selected']) && !empty($_POST['domain_ids'])) {
                 if ($result['days_left'] <= 15) {
                     $msg = "🔔 SSL domain akan expired dalam {$result['days_left']} hari (hingga {$result['valid_to']})";
                     send_notification($domain['url'], $msg);
-                    $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)")->execute([$id, $msg]);
+                    $log = $pdo->prepare("INSERT INTO logs (domain_id, type, message) VALUES (?, 'ssl', ?)");
+                    $log->execute([$id, $msg]);
                 }
             } else {
                 $stmtUpdate->execute([null, null, $id]);
@@ -150,10 +135,11 @@ if (isset($_POST['check_selected']) && !empty($_POST['domain_ids'])) {
     exit;
 }
 
-// === Hapus terpilih
 if (isset($_POST['delete_selected']) && !empty($_POST['domain_ids'])) {
     $placeholders = rtrim(str_repeat('?,', count($_POST['domain_ids'])), ',');
-    $pdo->prepare("DELETE FROM domains WHERE id IN ($placeholders)")->execute($_POST['domain_ids']);
+    $stmt = $pdo->prepare("DELETE FROM domains WHERE id IN ($placeholders)");
+    $stmt->execute($_POST['domain_ids']);
     header('Location: domains.php');
     exit;
 }
+?>

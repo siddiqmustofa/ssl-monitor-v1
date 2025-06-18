@@ -75,6 +75,15 @@ $domains = $pdo->query("SELECT * FROM domains ORDER BY last_checked DESC")->fetc
 
 <div class="main">
   <h2 class="mb-4">🌐 Kelola Domain</h2>
+
+  <?php if (isset($_GET['success']) && $_GET['success'] === 'added'): ?>
+    <div class="alert alert-success">✅ Domain berhasil ditambahkan.</div>
+  <?php elseif (isset($_GET['error']) && $_GET['error'] === 'exists'): ?>
+    <div class="alert alert-warning">⚠️ Domain sudah terdaftar.</div>
+  <?php elseif (isset($_GET['error']) && $_GET['error'] === 'invalid'): ?>
+    <div class="alert alert-danger">❌ URL domain tidak valid.</div>
+  <?php endif; ?>
+
   <form method="POST" action="api.php" class="row g-2 mb-4">
     <div class="col-md-10">
       <input type="text" name="url" class="form-control" placeholder="example.com atau https://example.com" required>
@@ -141,3 +150,4 @@ $domains = $pdo->query("SELECT * FROM domains ORDER BY last_checked DESC")->fetc
 </div>
 </body>
 </html>
+

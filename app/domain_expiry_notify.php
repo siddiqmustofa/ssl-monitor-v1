@@ -12,30 +12,40 @@ use Iodev\Whois\Factory;
 $message = null;
 $domains = [];
 
-// Kirim notifikasi manual
+// Ambil root domain
+function getRootDomain($domain) {
+  $host = parse_url($domain, PHP_URL_HOST) ?? $domain;
+  $parts = explode('.', $host);
+  $count = count($parts);
+  $tld_exceptions = ['co.id', 'or.id', 'ac.id', 'go.id', 'sch.id', 'co.uk', 'gov.uk', 'web.id'];
+  if ($count >= 3) {
+    $last_two = $parts[$count - 2] . '.' . $parts[$count - 1];
+    if (in_array($last_two, $tld_exceptions)) {
+      return $parts[$count - 3] . '.' . $last_two;
+    }
+  }
+  return $count >= 2 ? $parts[$count - 2] . '.' . $parts[$count - 1] : $host;
+}
+
+// Notifikasi manual
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notify_now'])) {
   $id = (int)$_POST['notify_now'];
-
   $stmt = $pdo->prepare("SELECT d.url, w.expiry_date, w.days_left FROM domains d LEFT JOIN domain_whois w ON d.id = w.domain_id WHERE d.id = ?");
   $stmt->execute([$id]);
   $data = $stmt->fetch(PDO::FETCH_ASSOC);
-
   $set = $pdo->query("SELECT telegram_token, telegram_chat_id FROM settings LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-
   if ($data && $set && $set['telegram_token'] && $set['telegram_chat_id']) {
     $messageText = "🔔 *Notifikasi Domain Expired*\n\n" .
                    "🌐 *Domain:* `{$data['url']}`\n" .
                    "📆 *Expired:* " . ($data['expiry_date'] ?? '-') . "\n" .
                    "⏳ *Sisa Hari:* " . ($data['days_left'] ?? '-') . "\n" .
                    "🕒 Dikirim manual oleh admin.";
-
     $url = "https://api.telegram.org/bot{$set['telegram_token']}/sendMessage";
     $payload = [
       'chat_id' => $set['telegram_chat_id'],
       'text' => $messageText,
       'parse_mode' => 'Markdown',
     ];
-
     $ch = curl_init($url);
     curl_setopt_array($ch, [
       CURLOPT_POST => true,
@@ -45,29 +55,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notify_now'])) {
     $res = curl_exec($ch);
     $err = curl_error($ch);
     curl_close($ch);
-
     $message = $err || !$res ? "❌ Gagal mengirim notifikasi ke Telegram." : "✅ Notifikasi berhasil dikirim.";
   } else {
     $message = "⚠️ Token atau Chat ID belum disetel.";
   }
 }
 
-// WHOIS manual semua domain
+// WHOIS semua domain
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_all'])) {
   $whoisClient = Factory::get()->createWhois();
   $success = 0; $failed = 0;
-
   $domainsToCheck = $pdo->query("SELECT id, url FROM domains")->fetchAll(PDO::FETCH_ASSOC);
   foreach ($domainsToCheck as $d) {
     $id = $d['id'];
-    $host = parse_url($d['url'], PHP_URL_HOST) ?? $d['url'];
-
+    $host = getRootDomain($d['url']);
     try {
       $info = $whoisClient->loadDomainInfo($host);
       if ($info && $info->getExpirationDate()) {
         $ts = $info->getExpirationDate();
         $days_left = floor(($ts - time()) / 86400);
-
         $stmt = $pdo->prepare("REPLACE INTO domain_whois (domain_id, expiry_date, days_left, checked_at) VALUES (?, ?, ?, NOW())");
         $stmt->execute([$id, date('Y-m-d H:i:s', $ts), $days_left]);
         $success++;
@@ -78,27 +84,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_all'])) {
       $failed++;
     }
   }
-
   $message = "✅ $success domain berhasil diperiksa. ❌ $failed gagal.";
 }
 
-// WHOIS manual per domain
+// WHOIS satu domain
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_now'])) {
   $id = (int)$_POST['check_now'];
   $stmt = $pdo->prepare("SELECT url FROM domains WHERE id = ?");
   $stmt->execute([$id]);
   $domain = $stmt->fetchColumn();
-
   if ($domain) {
     $whoisClient = Factory::get()->createWhois();
-    $host = parse_url($domain, PHP_URL_HOST) ?? $domain;
-
+    $host = getRootDomain($domain);
     try {
       $info = $whoisClient->loadDomainInfo($host);
       if ($info && $info->getExpirationDate()) {
         $ts = $info->getExpirationDate();
         $days_left = floor(($ts - time()) / 86400);
-
         $stmt = $pdo->prepare("REPLACE INTO domain_whois (domain_id, expiry_date, days_left, checked_at) VALUES (?, ?, ?, NOW())");
         $stmt->execute([$id, date('Y-m-d H:i:s', $ts), $days_left]);
         $message = "✅ WHOIS untuk $host berhasil diperbarui.";
@@ -113,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_now'])) {
   }
 }
 
-// Ambil data domain + WHOIS
+// Ambil data WHOIS
 $stmt = $pdo->query("
   SELECT d.id, d.url, w.expiry_date, w.days_left, w.checked_at
   FROM domains d
@@ -213,7 +215,7 @@ $domains = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php foreach ($domains as $i => $row): ?>
               <tr class="<?= ($row['days_left'] !== null && $row['days_left'] <= 7) ? 'table-danger' : '' ?>">
                 <td><?= $i + 1 ?></td>
-                <td><?= htmlspecialchars($row['url']) ?></td>
+                <td title="<?= htmlspecialchars($row['url']) ?>"><?= htmlspecialchars(getRootDomain($row['url'])) ?></td>
                 <td><?= $row['expiry_date'] ? date('Y-m-d', strtotime($row['expiry_date'])) : '-' ?></td>
                 <td><?= $row['days_left'] !== null ? $row['days_left'] : '-' ?></td>
                 <td><?= $row['checked_at'] ? date('Y-m-d H:i', strtotime($row['checked_at'])) : '-' ?></td>

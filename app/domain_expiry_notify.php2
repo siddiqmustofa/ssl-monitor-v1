@@ -12,6 +12,26 @@ use Iodev\Whois\Factory;
 $message = null;
 $domains = [];
 
+// Fungsi untuk mengambil root domain dari URL/subdomain
+function getRootDomain($domain) {
+  $host = parse_url($domain, PHP_URL_HOST) ?? $domain;
+  $parts = explode('.', $host);
+  $count = count($parts);
+
+  $tld_exceptions = ['co.id', 'or.id', 'ac.id', 'go.id', 'sch.id', 'co.uk', 'gov.uk', 'web.id'];
+
+  if ($count >= 3) {
+    $last_two = $parts[$count - 2] . '.' . $parts[$count - 1];
+    if (in_array($last_two, $tld_exceptions)) {
+      return $parts[$count - 3] . '.' . $last_two;
+    }
+  }
+
+  return $count >= 2
+    ? $parts[$count - 2] . '.' . $parts[$count - 1]
+    : $host;
+}
+
 // Kirim notifikasi manual
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notify_now'])) {
   $id = (int)$_POST['notify_now'];
@@ -60,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_all'])) {
   $domainsToCheck = $pdo->query("SELECT id, url FROM domains")->fetchAll(PDO::FETCH_ASSOC);
   foreach ($domainsToCheck as $d) {
     $id = $d['id'];
-    $host = parse_url($d['url'], PHP_URL_HOST) ?? $d['url'];
+    $host = getRootDomain($d['url']);
 
     try {
       $info = $whoisClient->loadDomainInfo($host);
@@ -91,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_now'])) {
 
   if ($domain) {
     $whoisClient = Factory::get()->createWhois();
-    $host = parse_url($domain, PHP_URL_HOST) ?? $domain;
+    $host = getRootDomain($domain);
 
     try {
       $info = $whoisClient->loadDomainInfo($host);
@@ -213,7 +233,7 @@ $domains = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php foreach ($domains as $i => $row): ?>
               <tr class="<?= ($row['days_left'] !== null && $row['days_left'] <= 7) ? 'table-danger' : '' ?>">
                 <td><?= $i + 1 ?></td>
-                <td><?= htmlspecialchars($row['url']) ?></td>
+                <td title="<?= htmlspecialchars($row['url']) ?>"><?= htmlspecialchars(getRootDomain($row['url'])) ?></td>
                 <td><?= $row['expiry_date'] ? date('Y-m-d', strtotime($row['expiry_date'])) : '-' ?></td>
                 <td><?= $row['days_left'] !== null ? $row['days_left'] : '-' ?></td>
                 <td><?= $row['checked_at'] ? date('Y-m-d H:i', strtotime($row['checked_at'])) : '-' ?></td>

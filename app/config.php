@@ -7,5 +7,5 @@ return [
     'admin_email' => 'admin@example.com',
     'expiry_warning_days' => 15,
     'auth_user' => 'admin',
-    'auth_pass' => 'admin123'
+    'auth_pass' => '1234'
 ];

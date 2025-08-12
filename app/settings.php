@@ -81,6 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <a href="dashboard.php"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
   <a href="domains.php"><i class="bi bi-globe2 me-2"></i>SSL</a>
   <a href="domain_expiry_notify.php"><i class="bi bi-calendar2-week me-2"></i>Cek Expired Domain</a>
+  <a href="name.php" ><i class="bi bi-hdd-network me-2"></i>NAME</a>
+  <a href="list_vm.php""><i class="bi bi-hdd-network me-2"></i>VM Biznet</a>
   <a href="settings.php" class="active"><i class="bi bi-gear me-2"></i>Pengaturan</a>
   <a href="users.php"><i class="bi bi-people me-2"></i>Pengguna</a>
   <a href="logs.php"><i class="bi bi-clock-history me-2"></i>Log</a>
